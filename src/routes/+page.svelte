@@ -1,7 +1,6 @@
 <script lang="ts">
     /* global globalThis, RequestInit */
     import * as jsxapi from 'jsxapi';
-    import { onMount } from 'svelte';
 
 	let input_text = 'Open a webview containing google.com';
 	let device_ip = '192.168.10.184';
@@ -11,27 +10,11 @@
     let last_cmd_js_code = "TBD";
     let open_api_auth_key = "";
     let open_api_llm_model = "gpt-3.5-turbo";
+    let mediaRecorder: MediaRecorder;
 
-
-    let recognition;
-
-    onMount(() => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
-        const speechRecognitionList = new SpeechGrammarList();
-        const grammar =
-            "#JSGF V1.0; grammar colors; public <color> = aqua | azure | beige | bisque | black | blue | brown | chocolate | coral | crimson | cyan | fuchsia | ghostwhite | gold | goldenrod | gray | green | indigo | ivory | khaki | lavender | lime | linen | magenta | maroon | moccasin | navy | olive | orange | orchid | peru | pink | plum | purple | red | salmon | sienna | silver | snow | tan | teal | thistle | tomato | turquoise | violet | white | yellow ;";
-        speechRecognitionList.addFromString(grammar, 1);
-        recognition.grammars = speechRecognitionList;
-        recognition.continuous = false;
-        recognition.lang = "en-US";
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-    });
-
-	async function askChatGpt(e: MouseEvent): Promise<void> {
-		console.log('received event', e);
+	async function askChatGpt(): Promise<void> {
+        last_cmd_error = "Asking ChatGPT to interpret command into code";
+		console.log('askChatGpt');
         const headers1 = new Headers();
         headers1.append("Content-Type", "application/json");
         headers1.append("Authorization", "Bearer " + open_api_auth_key);
@@ -88,7 +71,7 @@ xapi.on('ready', async () => {
                     { role: "system", content: "Process the following queries in the context of xapi for webex devices "
                         + "and only return javascript code which uses jsxapi. Make sure to include await keyword when executing xapi requests. "
                         + "Assume that the following code is already written and return only the code that is "
-                        + "supposed to go in the xapi connection success callback. ```javascript\n" + template + "```\n",
+                        + "supposed to go in the xapi connection success callback. I repeat, do not return rest of the tempate code. ```javascript\n" + template + "```\n",
                         name: "my_app_frontend"
                     },
                     { role: "user", content: input_text, name: "my_app_frontend"},
@@ -141,6 +124,8 @@ xapi.on('ready', async () => {
 	}
 
     async function do_execute_js(js_to_exec: string) {
+
+        last_cmd_error = "Executing javascript code on device";
         // Connecting using WebSockets
         jsxapi
             .connect('wss://' + device_ip, {
@@ -181,15 +166,73 @@ console.log("volume is: " + volume);
 
     }
 
-	async function askChatGptVoice(e: MouseEvent): Promise<void> {
-        console.log("askChatGptVoice clicked");
-        recognition.start();
-        console.log("Ready to receive a color command.");
-
-        recognition.onresult = (event:any) => {
-            const color = event.results[0][0].transcript;
-            console.log("Got transcript: ", color);
+	async function sendAudioToServer(audioBlob: any) {
+        last_cmd_error = "Transcribing audio";
+        console.log("sendAudioDataToServer of size", audioBlob.size);
+        let formdata = new FormData();
+        formdata.append('file', audioBlob, "audio.webm");
+        formdata.append("model", "whisper-1");
+        formdata.append("language", "en");
+        const headers2 = new Headers();
+        // headers2.append("Content-Type", "application/json");
+        headers2.append("Authorization", "Bearer " + open_api_auth_key);
+        const options2: RequestInit = {
+            method: "POST", // *GET, POST, PUT, DELETE, etc.
+            mode: "cors", // no-cors, *cors, same-origin
+            cache: "default", // *default, no-cache, reload, force-cache, only-if-cached
+            // credentials: "same-origin", // include, *same-origin, omit
+            headers: headers2,
+            // redirect: "follow", // manual, *follow, error
+            // referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+            body: formdata,
         };
+        const url2 = "https://api.openai.com/v1/audio/transcriptions";
+        console.log("making transcibe request");
+		const res2 = await fetch(new Request(url2, options2)).catch((err) => {
+            console.warn("Failed to successfully get transcript from openai whisper model");
+            last_cmd_error = "Failed to get transcript from openai transcript model: " + err;
+        });
+        console.log("received res2", res2);
+        if (!res2) {
+            throw new Error("res2 was void");
+        }
+        const res2_str = await res2.clone().text();
+        const res2_json = await res2.json();
+        console.log("received res2_str", res2_str);
+        input_text = res2_json["text"];
+        askChatGpt();
+    }
+
+    async function askChatGptVoice(): Promise<void> {
+
+        last_cmd_error = "Recording voice";
+        console.log("askChatGptVoice clicked");
+        if (mediaRecorder && mediaRecorder.state == "recording") {
+            console.log("Stopping mediaRecorder");
+            mediaRecorder.stop();
+            return;
+        }
+        navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+            .then(stream => {
+                const options = {
+                    audioBitsPerSecond: 128000,
+                    mimeType: "audio/webm",
+                };
+                mediaRecorder = new MediaRecorder(stream, options);
+                mediaRecorder.start();
+
+                let audioChunks : any[] = [];
+                mediaRecorder.addEventListener("dataavailable", event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener("stop", async () => {
+                    console.log("Stopped mediaRecorder, mime type =", mediaRecorder.mimeType);
+                    const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+                    await sendAudioToServer(audioBlob);
+                });
+
+            });
     }
 
 </script>
@@ -237,7 +280,7 @@ console.log("volume is: " + volume);
 	</label>
 	<div class="flex flex-row gap-2">
 		<button on:click={askChatGptVoice} class="p-2 border-slate-600 border-2 w-48 text-center bg-slate-200">
-			Ask ChatGPT voice
+            { mediaRecorder && mediaRecorder.state == "recording" ? "Stop recording" : "Ask ChatGPT voice"}
 		</button>
 		<button on:click={askChatGpt} class="p-2 border-slate-600 border-2 w-48 text-center bg-slate-200">
 			Ask ChatGPT text
