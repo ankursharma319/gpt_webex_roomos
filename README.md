@@ -28,5 +28,6 @@ You can preview the production build with `npm run preview`.
 
 ```bash
 nix develop
-surge
+npm run build
+surge ./build/ gpt_webex.surge.sh
 ```

@@ -1,6 +1,7 @@
 <script lang="ts">
     /* global globalThis, RequestInit */
     import * as jsxapi from 'jsxapi';
+    import { onMount } from 'svelte';
 
 	let input_text = 'Open a webview containing google.com';
 	let device_ip = '192.168.10.184';
@@ -11,6 +12,15 @@
     let open_api_auth_key = "";
     let open_api_llm_model = "gpt-3.5-turbo";
     let mediaRecorder: MediaRecorder;
+
+    onMount(async () => {
+        console.log("window.location.search = ", window.location.search);
+        const urlParams = new URLSearchParams(window.location.search);
+        open_api_auth_key = urlParams.get('openapi_key') ?? "";
+        device_password = urlParams.get('password') ?? "";
+        console.log("onMount open_api_auth_key = ", open_api_auth_key);
+        console.log("onMount device_password = ", device_password);
+    });
 
 	async function askChatGpt(): Promise<void> {
         last_cmd_error = "Asking ChatGPT to interpret command into code";
