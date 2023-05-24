@@ -107,14 +107,18 @@ xapi.on('ready', async () => {
         let m;
         let codes = [];
 
-        while ((m = my_regex.exec(completion)) !== null) {
-            // This is necessary to avoid infinite loops with zero-width matches
-            if (m.index === my_regex.lastIndex) {
-                my_regex.lastIndex++;
-            }
+        if (completion.includes("```")) {
+            while ((m = my_regex.exec(completion)) !== null) {
+                // This is necessary to avoid infinite loops with zero-width matches
+                if (m.index === my_regex.lastIndex) {
+                    my_regex.lastIndex++;
+                }
 
-            // Push the matched text (group 1) to the codes array
-            codes.push(m[1]);
+                // Push the matched text (group 1) to the codes array
+                codes.push(m[1]);
+            }
+        } else {
+            codes = [completion];
         }
 
         console.log(codes);
@@ -280,7 +284,7 @@ console.log("volume is: " + volume);
 	</label>
 	<div class="flex flex-row gap-2">
 		<button on:click={askChatGptVoice} class="p-2 border-slate-600 border-2 w-48 text-center bg-slate-200">
-            { mediaRecorder && mediaRecorder.state == "recording" ? "Stop recording" : "Ask ChatGPT voice"}
+            { mediaRecorder && mediaRecorder.state == "recording" ? "Toggle recording" : "Ask ChatGPT voice"}
 		</button>
 		<button on:click={askChatGpt} class="p-2 border-slate-600 border-2 w-48 text-center bg-slate-200">
 			Ask ChatGPT text

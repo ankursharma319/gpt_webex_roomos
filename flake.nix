@@ -26,6 +26,7 @@
         pkgs.mkShell {
           buildInputs = [
             pkgs.nodePackages.npm
+            pkgs.nodePackages.surge
             pkgs.nodejs
           ];
         }
