@@ -1,6 +1,7 @@
 <script lang="ts">
     /* global globalThis, RequestInit */
     import * as jsxapi from 'jsxapi';
+    import { onMount } from 'svelte';
 
 	let input_text = 'Open a webview containing google.com';
 	let device_ip = '192.168.10.184';
@@ -10,6 +11,24 @@
     let last_cmd_js_code = "TBD";
     let open_api_auth_key = "";
     let open_api_llm_model = "gpt-3.5-turbo";
+
+
+    let recognition;
+
+    onMount(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+        const speechRecognitionList = new SpeechGrammarList();
+        const grammar =
+            "#JSGF V1.0; grammar colors; public <color> = aqua | azure | beige | bisque | black | blue | brown | chocolate | coral | crimson | cyan | fuchsia | ghostwhite | gold | goldenrod | gray | green | indigo | ivory | khaki | lavender | lime | linen | magenta | maroon | moccasin | navy | olive | orange | orchid | peru | pink | plum | purple | red | salmon | sienna | silver | snow | tan | teal | thistle | tomato | turquoise | violet | white | yellow ;";
+        speechRecognitionList.addFromString(grammar, 1);
+        recognition.grammars = speechRecognitionList;
+        recognition.continuous = false;
+        recognition.lang = "en-US";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+    });
 
 	async function askChatGpt(e: MouseEvent): Promise<void> {
 		console.log('received event', e);
@@ -161,6 +180,18 @@ console.log("volume is: " + volume);
         await do_execute_js(test_js_code);
 
     }
+
+	async function askChatGptVoice(e: MouseEvent): Promise<void> {
+        console.log("askChatGptVoice clicked");
+        recognition.start();
+        console.log("Ready to receive a color command.");
+
+        recognition.onresult = (event:any) => {
+            const color = event.results[0][0].transcript;
+            console.log("Got transcript: ", color);
+        };
+    }
+
 </script>
 
 <svelte:head>
@@ -180,13 +211,13 @@ console.log("volume is: " + volume);
         </label>
 	    <label>
             <span>Password: </span>
-            <input type="text" bind:value={device_password} class={"border-2 p-1 " + (device_password ? "border-slate-600" : "border-red-600")}/>
+            <input type="password" bind:value={device_password} class={"border-2 p-1 " + (device_password ? "border-slate-600" : "border-red-600")}/>
         </label>
     </div>
     <div class="flex flex-row gap-4">
 	    <label class="">
             <span>OpenAI Api Key: </span>
-            <input type="text" bind:value={open_api_auth_key}
+            <input type="password" bind:value={open_api_auth_key}
                 class={"border-2 p-1 " + (open_api_auth_key ? "border-slate-700" : "border-red-500")}
             />
         </label>
@@ -205,8 +236,11 @@ console.log("volume is: " + volume);
 		/>
 	</label>
 	<div class="flex flex-row gap-2">
+		<button on:click={askChatGptVoice} class="p-2 border-slate-600 border-2 w-48 text-center bg-slate-200">
+			Ask ChatGPT voice
+		</button>
 		<button on:click={askChatGpt} class="p-2 border-slate-600 border-2 w-48 text-center bg-slate-200">
-			Ask ChatGPT
+			Ask ChatGPT text
 		</button>
 		<button on:click={executeJs} class="p-2 border-slate-600 border-2 w-48 text-center bg-slate-200">
 			Execute JS on device
