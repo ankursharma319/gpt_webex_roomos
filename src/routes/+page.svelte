@@ -71,7 +71,7 @@ xapi.on('ready', async () => {
                     { role: "system", content: "Process the following queries in the context of xapi for webex devices "
                         + "and only return javascript code which uses jsxapi. Make sure to include await keyword when executing xapi requests. "
                         + "Assume that the following code is already written and return only the code that is "
-                        + "supposed to go in the xapi connection success callback. I repeat, do not return rest of the tempate code. ```javascript\n" + template + "```\n",
+                        + "supposed to go in the xapi connection success callback. I repeat, do not return rest of the template code. ```javascript\n" + template + "```\n",
                         name: "my_app_frontend"
                     },
                     { role: "user", content: input_text, name: "my_app_frontend"},
@@ -148,7 +148,7 @@ xapi.on('ready', async () => {
                     last_cmd_error = "";
                 } catch (err: any) {
                     console.warn("failed to execute code, got error", err);
-                    last_cmd_error = err.toString();
+                    last_cmd_error = JSON.stringify(err);
                 }
                 xapi.close();
             });
